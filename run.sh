@@ -1,25 +1,17 @@
 #!/bin/sh
 
-if [[ ! -z $UID ]]; then
-  USER=dockeruser
-  adduser -D -H -u $UID $USER
+H=/home/dockeruser
 
-  if [[ ! -z $GID ]]; then
-    GROUP=
+GKE_CLUSTERS=$(gcloud container clusters list --format json | jq -r '.[] | "\(.name) --region \(.location)"')
 
-    if ! grep -q ":$GID:" /etc/group; then
-      GROUP=dockergroup
-      addgroup -g $GID $GROUP
-    else
-      GROUP=$(getent group $GID | cut -d: -f1)
-    fi
-
-    addgroup $USER $GROUP
-  fi
-fi
-
-if [[ ! -z $UID ]]; then
-  su $USER -c "${@}"
-else
-  $@
-fi
+docker run -it \
+  -v $HOME/.helm:$H/.helm \
+  -v $HOME/.kube:$H/.kube-host \
+  -v $HOME/.config/gcloud:$H/.config/gcloud \
+  -v $HOME/.aws:$H/.aws \
+  -e GKE_CLUSTERS="${GKE_CLUSTERS}" \
+  -e UID=$UID \
+  -e GID=$GID \
+  -e KUBECONFIG=$H/.kube/config \
+  -e HELM_HOME=$H/.helm \
+  diversario/k8s-tools:latest -- $@
